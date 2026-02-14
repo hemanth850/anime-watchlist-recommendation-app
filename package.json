@@ -1,0 +1,21 @@
+{
+  "name": "anime-watchlist-recommendation-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Anime watchlist and recommendation platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "npm run dev -w @anime-app/web",
+    "dev:api": "npm run dev -w @anime-app/api",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}
