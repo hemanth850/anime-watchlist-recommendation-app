@@ -1,0 +1,69 @@
+:root {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #111827;
+  background: radial-gradient(circle at top right, #ffe7c7, #fff9ed 55%, #fff);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.page {
+  width: min(960px, 92vw);
+  margin: 2.5rem auto 4rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.hero {
+  background: linear-gradient(135deg, #f97316, #f59e0b);
+  color: #fff;
+  border-radius: 1rem;
+  padding: 1.6rem;
+}
+
+.hero h1 {
+  margin: 0.4rem 0;
+  font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
+.subtitle {
+  margin: 0.6rem 0 0;
+  max-width: 70ch;
+}
+
+.panel {
+  background-color: rgba(255, 255, 255, 0.78);
+  border: 1px solid #ffedd5;
+  border-radius: 0.8rem;
+  padding: 1rem 1.2rem;
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.recommendation-list,
+.checklist {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.error {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
