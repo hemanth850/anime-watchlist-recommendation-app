@@ -17,10 +17,10 @@ Exit criteria:
 
 Goal: add user accounts and session management.
 
-- [ ] User model and persistence layer
-- [ ] Signup/login/logout endpoints
-- [ ] Frontend auth flows
-- [ ] Protected routes
+- [x] User model and persistence layer (in-memory baseline)
+- [x] Signup/login/logout endpoints
+- [x] Frontend auth flows
+- [x] Protected routes
 
 Exit criteria:
 - User can create account and log in.
@@ -72,4 +72,3 @@ Goal: production-ready workflow and GitHub release.
 
 Exit criteria:
 - Tagged release on GitHub with deployment instructions and changelog.
-

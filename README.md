@@ -4,7 +4,7 @@ Full-stack web app to track anime, manage a watchlist, rate completed shows, and
 
 ## Project Status
 
-Current phase: `Phase 1 - Foundation`
+Current phase: `Phase 2 - Authentication`
 
 See `docs/ROADMAP.md` for full phase plan from MVP to GitHub release.
 
@@ -55,10 +55,21 @@ npm run dev
 - `npm run build` - build all workspaces
 - `npm run typecheck` - run TypeScript checks
 
+## Authentication Endpoints
+
+- `POST /auth/signup` with `{ email, username, password }`
+- `POST /auth/login` with `{ email, password }`
+- `GET /auth/me` with `Authorization: Bearer <token>`
+- `POST /auth/logout`
+
+Local demo account:
+- Email: `demo@anime.app`
+- Password: `password123`
+
 ## Phase Plan
 
 - Phase 1: Foundation and architecture
-- Phase 2: Authentication + user profiles
+- Phase 2: Authentication + user profiles (in progress)
 - Phase 3: Watchlist CRUD + ratings
 - Phase 4: Recommendation engine (content-based baseline)
 - Phase 5: Search/discovery UX and polish
