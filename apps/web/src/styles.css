@@ -56,6 +56,52 @@ body {
   margin-top: 0;
 }
 
+.auth-form {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.auth-form input {
+  border: 1px solid #fdba74;
+  border-radius: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+}
+
+button {
+  width: fit-content;
+  border: 0;
+  border-radius: 0.45rem;
+  background: #ea580c;
+  color: #fff;
+  padding: 0.55rem 0.85rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.secondary-btn {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #7c2d12;
+}
+
+.hint {
+  color: #7c2d12;
+  margin-bottom: 0;
+}
+
 .recommendation-list,
 .checklist {
   margin: 0.5rem 0 0;
@@ -66,4 +112,3 @@ body {
   color: #b91c1c;
   font-weight: 600;
 }
-

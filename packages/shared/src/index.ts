@@ -24,6 +24,37 @@ export type HealthResponse = {
   timestamp: string;
 };
 
+export type UserPublic = {
+  id: string;
+  email: string;
+  username: string;
+  createdAt: string;
+};
+
+export type SignupRequest = {
+  email: string;
+  username: string;
+  password: string;
+};
+
+export type LoginRequest = {
+  email: string;
+  password: string;
+};
+
+export type AuthSuccessResponse = {
+  token: string;
+  user: UserPublic;
+};
+
+export type AuthMeResponse = {
+  user: UserPublic;
+};
+
+export type AuthErrorResponse = {
+  message: string;
+};
+
 export const mockAnimeCatalog: Anime[] = [
   {
     id: "aot",
@@ -54,4 +85,3 @@ export const mockAnimeCatalog: Anime[] = [
     rating: 8.7
   }
 ];
-
