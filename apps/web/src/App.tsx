@@ -1,20 +1,35 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type {
+  AnimeStatus,
   AuthMeResponse,
   AuthSuccessResponse,
+  CreateWatchlistItemRequest,
   HealthResponse,
   LoginRequest,
   RecommendationResponse,
   SignupRequest,
-  UserPublic
+  UpdateWatchlistItemRequest,
+  UserPublic,
+  WatchlistEntry,
+  WatchlistResponse
 } from "@anime-app/shared";
 import { mockAnimeCatalog } from "@anime-app/shared";
 
 const apiBaseUrl = "http://localhost:4000";
 const tokenStorageKey = "anime_app_token";
+const statusOptions: AnimeStatus[] = ["plan", "watching", "completed", "dropped"];
 
 type AuthMode = "login" | "signup";
+type WatchlistDraft = Record<
+  string,
+  {
+    status: AnimeStatus;
+    rating: string;
+    notes: string;
+    progressEpisodes: number;
+  }
+>;
 
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, options);
@@ -25,6 +40,9 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(errorBody?.message ?? `Request failed: ${response.status}`);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
   return (await response.json()) as T;
 }
 
@@ -41,6 +59,13 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [baseError, setBaseError] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(false);
+  const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
+  const [watchlistDrafts, setWatchlistDrafts] = useState<WatchlistDraft>({});
+  const [watchlistError, setWatchlistError] = useState<string | null>(null);
+  const [selectedAnimeId, setSelectedAnimeId] = useState<string>(
+    mockAnimeCatalog[0]?.id ?? ""
+  );
+  const [selectedAnimeStatus, setSelectedAnimeStatus] = useState<AnimeStatus>("plan");
 
   useEffect(() => {
     const load = async () => {
@@ -61,6 +86,25 @@ function App() {
     void load();
   }, []);
 
+  const authHeaders = useMemo(() => {
+    if (!authToken) {
+      return undefined;
+    }
+
+    return {
+      Authorization: `Bearer ${authToken}`
+    };
+  }, [authToken]);
+
+  const loadWatchlist = async (token: string) => {
+    const data = await fetchJson<WatchlistResponse>("/watchlist", {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+    setWatchlist(data.items);
+  };
+
   useEffect(() => {
     const storedToken = localStorage.getItem(tokenStorageKey);
     if (!storedToken) {
@@ -76,6 +120,7 @@ function App() {
         });
         setAuthToken(storedToken);
         setAuthUser(me.user);
+        await loadWatchlist(storedToken);
       } catch {
         localStorage.removeItem(tokenStorageKey);
       }
@@ -83,6 +128,19 @@ function App() {
 
     void bootstrapSession();
   }, []);
+
+  useEffect(() => {
+    const drafts: WatchlistDraft = {};
+    for (const item of watchlist) {
+      drafts[item.animeId] = {
+        status: item.status,
+        rating: item.rating?.toString() ?? "",
+        notes: item.notes,
+        progressEpisodes: item.progressEpisodes
+      };
+    }
+    setWatchlistDrafts(drafts);
+  }, [watchlist]);
 
   const recommendationView = useMemo(() => {
     if (!recommendations) {
@@ -99,6 +157,33 @@ function App() {
       };
     });
   }, [recommendations]);
+
+  const animeById = useMemo(
+    () =>
+      Object.fromEntries(
+        mockAnimeCatalog.map((anime) => [anime.id, anime] as const)
+      ),
+    []
+  );
+
+  const updateDraft = (
+    animeId: string,
+    updater: (
+      current: WatchlistDraft[string]
+    ) => WatchlistDraft[string]
+  ) => {
+    setWatchlistDrafts((prev) => {
+      const current = prev[animeId];
+      if (!current) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [animeId]: updater(current)
+      };
+    });
+  };
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -124,6 +209,7 @@ function App() {
       setAuthToken(result.token);
       setAuthUser(result.user);
       setPassword("");
+      await loadWatchlist(result.token);
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : "Authentication failed";
@@ -138,16 +224,109 @@ function App() {
       if (authToken) {
         await fetchJson<{ message: string }>("/auth/logout", {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${authToken}`
-          }
+          headers: authHeaders
         });
       }
     } finally {
       localStorage.removeItem(tokenStorageKey);
       setAuthToken(null);
       setAuthUser(null);
+      setWatchlist([]);
+      setWatchlistDrafts({});
       setPassword("");
+      setWatchlistError(null);
+    }
+  };
+
+  const handleAddToWatchlist = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!authHeaders) {
+      return;
+    }
+    if (!selectedAnimeId) {
+      setWatchlistError("Select an anime before adding to watchlist");
+      return;
+    }
+
+    setWatchlistError(null);
+    try {
+      const payload: CreateWatchlistItemRequest = {
+        animeId: selectedAnimeId,
+        status: selectedAnimeStatus
+      };
+      await fetchJson<WatchlistEntry>("/watchlist", {
+        method: "POST",
+        headers: {
+          ...authHeaders,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      await loadWatchlist(authToken!);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to add watchlist item";
+      setWatchlistError(message);
+    }
+  };
+
+  const handleUpdateWatchlistItem = async (animeId: string) => {
+    if (!authHeaders) {
+      return;
+    }
+
+    const draft = watchlistDrafts[animeId];
+    if (!draft) {
+      return;
+    }
+
+    const ratingValue =
+      draft.rating.trim() === "" ? null : Number.parseFloat(draft.rating.trim());
+    if (ratingValue !== null && Number.isNaN(ratingValue)) {
+      setWatchlistError("Rating must be a valid number between 0 and 10");
+      return;
+    }
+
+    setWatchlistError(null);
+    try {
+      const payload: UpdateWatchlistItemRequest = {
+        status: draft.status,
+        rating: ratingValue,
+        notes: draft.notes,
+        progressEpisodes: draft.progressEpisodes
+      };
+      await fetchJson<WatchlistEntry>(`/watchlist/${animeId}`, {
+        method: "PATCH",
+        headers: {
+          ...authHeaders,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      await loadWatchlist(authToken!);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to update watchlist item";
+      setWatchlistError(message);
+    }
+  };
+
+  const handleDeleteWatchlistItem = async (animeId: string) => {
+    if (!authHeaders) {
+      return;
+    }
+
+    setWatchlistError(null);
+    try {
+      await fetchJson<void>(`/watchlist/${animeId}`, {
+        method: "DELETE",
+        headers: authHeaders
+      });
+      await loadWatchlist(authToken!);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to delete watchlist item";
+      setWatchlistError(message);
     }
   };
 
@@ -157,7 +336,7 @@ function App() {
         <p className="eyebrow">Anime Watchlist Platform</p>
         <h1>Track what you watch and discover what to watch next.</h1>
         <p className="subtitle">
-          Phase 2 adds account signup/login plus protected session state.
+          Phase 3 adds watchlist CRUD with status transitions, ratings, and notes.
         </p>
       </section>
 
@@ -249,6 +428,148 @@ function App() {
         </section>
       )}
 
+      {authUser && (
+        <section className="panel">
+          <h2>Your Watchlist</h2>
+          {watchlistError && <p className="error">{watchlistError}</p>}
+
+          <form className="watchlist-add-form" onSubmit={handleAddToWatchlist}>
+            <label>
+              Anime
+              <select
+                value={selectedAnimeId}
+                onChange={(event) => setSelectedAnimeId(event.target.value)}
+              >
+                {mockAnimeCatalog.map((anime) => (
+                  <option key={anime.id} value={anime.id}>
+                    {anime.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Initial Status
+              <select
+                value={selectedAnimeStatus}
+                onChange={(event) =>
+                  setSelectedAnimeStatus(event.target.value as AnimeStatus)
+                }
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit">Add to Watchlist</button>
+          </form>
+
+          {watchlist.length === 0 && (
+            <p>Your watchlist is empty. Add an anime to get started.</p>
+          )}
+
+          <ul className="watchlist-grid">
+            {watchlist.map((item) => {
+              const anime = animeById[item.animeId];
+              const draft = watchlistDrafts[item.animeId];
+              if (!draft) {
+                return null;
+              }
+
+              return (
+                <li key={item.animeId} className="watchlist-card">
+                  <h3>{anime?.title ?? item.animeId}</h3>
+                  <p className="watchlist-meta">
+                    Episodes: {anime?.episodes ?? "-"} | Genres:{" "}
+                    {anime?.genres.join(", ") ?? "-"}
+                  </p>
+
+                  <label>
+                    Status
+                    <select
+                      value={draft.status}
+                      onChange={(event) =>
+                        updateDraft(item.animeId, (current) => ({
+                          ...current,
+                          status: event.target.value as AnimeStatus
+                        }))
+                      }
+                    >
+                      {statusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Rating (0-10)
+                    <input
+                      type="number"
+                      min={0}
+                      max={10}
+                      step={0.1}
+                      value={draft.rating}
+                      onChange={(event) =>
+                        updateDraft(item.animeId, (current) => ({
+                          ...current,
+                          rating: event.target.value
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Progress Episodes
+                    <input
+                      type="number"
+                      min={0}
+                      value={draft.progressEpisodes}
+                      onChange={(event) =>
+                        updateDraft(item.animeId, (current) => ({
+                          ...current,
+                          progressEpisodes:
+                            Number.parseInt(event.target.value, 10) || 0
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <label>
+                    Notes
+                    <textarea
+                      rows={3}
+                      value={draft.notes}
+                      onChange={(event) =>
+                        updateDraft(item.animeId, (current) => ({
+                          ...current,
+                          notes: event.target.value
+                        }))
+                      }
+                    />
+                  </label>
+
+                  <div className="watchlist-actions">
+                    <button type="button" onClick={() => handleUpdateWatchlistItem(item.animeId)}>
+                      Save Changes
+                    </button>
+                    <button
+                      className="secondary-btn"
+                      type="button"
+                      onClick={() => handleDeleteWatchlistItem(item.animeId)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <section className="panel">
         <h2>Recommendation Preview</h2>
         {!recommendations && !baseError && <p>Loading recommendations...</p>}
@@ -261,17 +582,6 @@ function App() {
             </li>
           ))}
         </ul>
-      </section>
-
-      <section className="panel">
-        <h2>Protected Route Preview</h2>
-        {!authUser && <p>Login required to access your personalized dashboard.</p>}
-        {authUser && (
-          <p>
-            Access granted. Next phase will show your private watchlist and ratings
-            here.
-          </p>
-        )}
       </section>
     </main>
   );

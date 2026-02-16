@@ -29,10 +29,10 @@ Exit criteria:
 
 Goal: provide core watchlist functionality.
 
-- [ ] Add anime catalog integration or seed data
-- [ ] Watchlist CRUD endpoints
-- [ ] Status transitions (`plan`, `watching`, `completed`, `dropped`)
-- [ ] Ratings and notes
+- [x] Add anime catalog integration or seed data
+- [x] Watchlist CRUD endpoints
+- [x] Status transitions (`plan`, `watching`, `completed`, `dropped`)
+- [x] Ratings and notes
 
 Exit criteria:
 - User can fully manage their anime list.
