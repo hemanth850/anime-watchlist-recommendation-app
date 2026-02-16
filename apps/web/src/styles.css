@@ -75,6 +75,20 @@ body {
   font: inherit;
 }
 
+.auth-form select,
+.auth-form textarea,
+.watchlist-add-form select,
+.watchlist-add-form input,
+.watchlist-grid select,
+.watchlist-grid input,
+.watchlist-grid textarea {
+  border: 1px solid #fdba74;
+  border-radius: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  width: 100%;
+}
+
 button {
   width: fit-content;
   border: 0;
@@ -95,6 +109,53 @@ button:disabled {
   background: #fff7ed;
   border: 1px solid #fdba74;
   color: #7c2d12;
+}
+
+.watchlist-add-form {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.watchlist-add-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.watchlist-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.watchlist-card {
+  border: 1px solid #fed7aa;
+  border-radius: 0.8rem;
+  padding: 0.9rem;
+  display: grid;
+  gap: 0.6rem;
+  background: #fff;
+}
+
+.watchlist-card label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.watchlist-meta {
+  margin: 0;
+  color: #7c2d12;
+  font-size: 0.95rem;
+}
+
+.watchlist-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .hint {

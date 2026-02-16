@@ -55,6 +55,32 @@ export type AuthErrorResponse = {
   message: string;
 };
 
+export type WatchlistEntry = {
+  userId: string;
+  animeId: string;
+  status: AnimeStatus;
+  rating: number | null;
+  notes: string;
+  progressEpisodes: number;
+  updatedAt: string;
+};
+
+export type WatchlistResponse = {
+  items: WatchlistEntry[];
+};
+
+export type CreateWatchlistItemRequest = {
+  animeId: string;
+  status?: AnimeStatus;
+};
+
+export type UpdateWatchlistItemRequest = {
+  status?: AnimeStatus;
+  rating?: number | null;
+  notes?: string;
+  progressEpisodes?: number;
+};
+
 export const mockAnimeCatalog: Anime[] = [
   {
     id: "aot",

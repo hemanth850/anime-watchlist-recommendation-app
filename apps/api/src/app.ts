@@ -3,9 +3,13 @@ import express from "express";
 import {
   type AuthMeResponse,
   type AuthSuccessResponse,
+  type CreateWatchlistItemRequest,
   type LoginRequest,
   type SignupRequest,
+  type UpdateWatchlistItemRequest,
+  type WatchlistResponse,
   mockAnimeCatalog,
+  type AnimeStatus,
   type HealthResponse,
   type RecommendationResponse
 } from "@anime-app/shared";
@@ -17,6 +21,13 @@ import {
   toPublicUser
 } from "./auth/store.js";
 import { signSessionToken } from "./auth/session.js";
+import {
+  addWatchlistItem,
+  getUserWatchlist,
+  getWatchlistItem,
+  removeWatchlistItem,
+  updateWatchlistItem
+} from "./watchlist/store.js";
 
 const app = express();
 
@@ -102,6 +113,143 @@ app.get("/auth/me", authRequired, (req, res) => {
 
 app.post("/auth/logout", (_req, res) => {
   res.status(200).json({ message: "logout successful" });
+});
+
+app.get("/watchlist", authRequired, (req, res) => {
+  const user = req.authUser;
+  if (!user) {
+    res.status(401).json({ message: "unauthorized" });
+    return;
+  }
+
+  const payload: WatchlistResponse = {
+    items: getUserWatchlist(user.id)
+  };
+  res.status(200).json(payload);
+});
+
+app.post("/watchlist", authRequired, (req, res) => {
+  const user = req.authUser;
+  if (!user) {
+    res.status(401).json({ message: "unauthorized" });
+    return;
+  }
+
+  const body = req.body as Partial<CreateWatchlistItemRequest>;
+  const animeId = body.animeId?.trim();
+  const status: AnimeStatus = body.status ?? "plan";
+  if (!animeId) {
+    res.status(400).json({ message: "animeId is required" });
+    return;
+  }
+
+  if (!["plan", "watching", "completed", "dropped"].includes(status)) {
+    res.status(400).json({ message: "invalid status value" });
+    return;
+  }
+
+  const animeExists = mockAnimeCatalog.some((anime) => anime.id === animeId);
+  if (!animeExists) {
+    res.status(404).json({ message: "anime not found in catalog" });
+    return;
+  }
+
+  if (getWatchlistItem(user.id, animeId)) {
+    res.status(409).json({ message: "anime already in watchlist" });
+    return;
+  }
+
+  const item = addWatchlistItem({
+    userId: user.id,
+    animeId,
+    status
+  });
+  res.status(201).json(item);
+});
+
+app.patch("/watchlist/:animeId", authRequired, (req, res) => {
+  const user = req.authUser;
+  if (!user) {
+    res.status(401).json({ message: "unauthorized" });
+    return;
+  }
+
+  const animeId = String(req.params.animeId ?? "");
+  if (!animeId) {
+    res.status(400).json({ message: "animeId path parameter is required" });
+    return;
+  }
+  const existing = getWatchlistItem(user.id, animeId);
+  if (!existing) {
+    res.status(404).json({ message: "watchlist item not found" });
+    return;
+  }
+
+  const body = req.body as Partial<UpdateWatchlistItemRequest>;
+  const updates: Partial<{
+    status: AnimeStatus;
+    rating: number | null;
+    notes: string;
+    progressEpisodes: number;
+  }> = {};
+
+  if (body.status !== undefined) {
+    if (!["plan", "watching", "completed", "dropped"].includes(body.status)) {
+      res.status(400).json({ message: "invalid status value" });
+      return;
+    }
+    updates.status = body.status;
+  }
+
+  if (body.rating !== undefined) {
+    if (body.rating !== null && (body.rating < 0 || body.rating > 10)) {
+      res.status(400).json({ message: "rating must be between 0 and 10" });
+      return;
+    }
+    updates.rating = body.rating;
+  }
+
+  if (body.notes !== undefined) {
+    updates.notes = body.notes.trim().slice(0, 500);
+  }
+
+  if (body.progressEpisodes !== undefined) {
+    if (!Number.isInteger(body.progressEpisodes) || body.progressEpisodes < 0) {
+      res.status(400).json({ message: "progressEpisodes must be a non-negative integer" });
+      return;
+    }
+    updates.progressEpisodes = body.progressEpisodes;
+  }
+
+  const updated = updateWatchlistItem(user.id, animeId, updates);
+  if (!updated) {
+    res.status(404).json({ message: "watchlist item not found" });
+    return;
+  }
+
+  res.status(200).json(updated);
+});
+
+app.delete("/watchlist/:animeId", authRequired, (req, res) => {
+  const user = req.authUser;
+  if (!user) {
+    res.status(401).json({ message: "unauthorized" });
+    return;
+  }
+
+  const animeId = String(req.params.animeId ?? "");
+  if (!animeId) {
+    res.status(400).json({ message: "animeId path parameter is required" });
+    return;
+  }
+
+  const deleted = removeWatchlistItem(user.id, animeId);
+  if (!deleted) {
+    res.status(404).json({ message: "watchlist item not found" });
+    return;
+  }
+
+  res.status(204).send();
 });
 
 app.get("/health", (_req, res) => {
