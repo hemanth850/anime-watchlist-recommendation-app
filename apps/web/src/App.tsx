@@ -50,6 +50,8 @@ function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [recommendations, setRecommendations] =
     useState<RecommendationResponse | null>(null);
+  const [personalizedRecommendations, setPersonalizedRecommendations] =
+    useState<RecommendationResponse | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -62,6 +64,7 @@ function App() {
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [watchlistDrafts, setWatchlistDrafts] = useState<WatchlistDraft>({});
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
+  const [personalizedError, setPersonalizedError] = useState<string | null>(null);
   const [selectedAnimeId, setSelectedAnimeId] = useState<string>(
     mockAnimeCatalog[0]?.id ?? ""
   );
@@ -105,6 +108,33 @@ function App() {
     setWatchlist(data.items);
   };
 
+  const loadPersonalizedRecommendations = async (token: string) => {
+    const data = await fetchJson<RecommendationResponse>(
+      "/recommendations/personalized",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+    setPersonalizedRecommendations(data);
+  };
+
+  const loadProtectedData = async (token: string) => {
+    await loadWatchlist(token);
+    try {
+      await loadPersonalizedRecommendations(token);
+      setPersonalizedError(null);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to load personalized recommendations";
+      setPersonalizedError(message);
+      setPersonalizedRecommendations(null);
+    }
+  };
+
   useEffect(() => {
     const storedToken = localStorage.getItem(tokenStorageKey);
     if (!storedToken) {
@@ -120,7 +150,7 @@ function App() {
         });
         setAuthToken(storedToken);
         setAuthUser(me.user);
-        await loadWatchlist(storedToken);
+        await loadProtectedData(storedToken);
       } catch {
         localStorage.removeItem(tokenStorageKey);
       }
@@ -209,7 +239,7 @@ function App() {
       setAuthToken(result.token);
       setAuthUser(result.user);
       setPassword("");
-      await loadWatchlist(result.token);
+      await loadProtectedData(result.token);
     } catch (submitError) {
       const message =
         submitError instanceof Error ? submitError.message : "Authentication failed";
@@ -233,8 +263,10 @@ function App() {
       setAuthUser(null);
       setWatchlist([]);
       setWatchlistDrafts({});
+      setPersonalizedRecommendations(null);
       setPassword("");
       setWatchlistError(null);
+      setPersonalizedError(null);
     }
   };
 
@@ -262,7 +294,7 @@ function App() {
         },
         body: JSON.stringify(payload)
       });
-      await loadWatchlist(authToken!);
+      await loadProtectedData(authToken!);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to add watchlist item";
@@ -303,7 +335,7 @@ function App() {
         },
         body: JSON.stringify(payload)
       });
-      await loadWatchlist(authToken!);
+      await loadProtectedData(authToken!);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to update watchlist item";
@@ -322,7 +354,7 @@ function App() {
         method: "DELETE",
         headers: authHeaders
       });
-      await loadWatchlist(authToken!);
+      await loadProtectedData(authToken!);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to delete watchlist item";
@@ -582,6 +614,32 @@ function App() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="panel">
+        <h2>Personalized Recommendations</h2>
+        {!authUser && <p>Login to see recommendations based on your watchlist activity.</p>}
+        {authUser && personalizedError && <p className="error">{personalizedError}</p>}
+        {authUser && !personalizedRecommendations && !personalizedError && (
+          <p>Loading personalized recommendations...</p>
+        )}
+        {authUser && personalizedRecommendations && personalizedRecommendations.items.length === 0 && (
+          <p>No unseen titles available yet. Expand the anime catalog in Phase 5.</p>
+        )}
+        {authUser && personalizedRecommendations && personalizedRecommendations.items.length > 0 && (
+          <ul className="recommendation-list">
+            {personalizedRecommendations.items.map((item) => {
+              const anime = animeById[item.animeId];
+              return (
+                <li key={`personalized-${item.animeId}`}>
+                  <h3>{anime?.title ?? item.animeId}</h3>
+                  <p>Score: {item.score.toFixed(2)}</p>
+                  <p>{item.reason}</p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </main>
   );

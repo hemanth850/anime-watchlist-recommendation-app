@@ -4,7 +4,7 @@ Full-stack web app to track anime, manage a watchlist, rate completed shows, and
 
 ## Project Status
 
-Current phase: `Phase 3 - Watchlist + Ratings`
+Current phase: `Phase 4 - Recommendation Engine`
 
 See `docs/ROADMAP.md` for full phase plan from MVP to GitHub release.
 
@@ -69,6 +69,11 @@ npm run dev
 - `PATCH /watchlist/:animeId` with `{ status?, rating?, notes?, progressEpisodes? }`
 - `DELETE /watchlist/:animeId`
 
+## Recommendation Endpoints
+
+- `GET /recommendations/preview`
+- `GET /recommendations/personalized` (protected)
+
 Local demo account:
 - Email: `demo@anime.app`
 - Password: `password123`
@@ -76,8 +81,8 @@ Local demo account:
 ## Phase Plan
 
 - Phase 1: Foundation and architecture
-- Phase 2: Authentication + user profiles (in progress)
+- Phase 2: Authentication + user profiles (completed baseline)
 - Phase 3: Watchlist CRUD + ratings (completed baseline)
-- Phase 4: Recommendation engine (content-based baseline)
+- Phase 4: Recommendation engine (completed baseline)
 - Phase 5: Search/discovery UX and polish
 - Phase 6: Test hardening, CI/CD, docs, and GitHub release

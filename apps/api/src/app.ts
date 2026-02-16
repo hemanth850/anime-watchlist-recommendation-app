@@ -28,6 +28,7 @@ import {
   removeWatchlistItem,
   updateWatchlistItem
 } from "./watchlist/store.js";
+import { getPersonalizedRecommendations } from "./recommendations/engine.js";
 
 const app = express();
 
@@ -125,6 +126,18 @@ app.get("/watchlist", authRequired, (req, res) => {
   const payload: WatchlistResponse = {
     items: getUserWatchlist(user.id)
   };
+  res.status(200).json(payload);
+});
+
+app.get("/recommendations/personalized", authRequired, (req, res) => {
+  const user = req.authUser;
+  if (!user) {
+    res.status(401).json({ message: "unauthorized" });
+    return;
+  }
+
+  const watchlist = getUserWatchlist(user.id);
+  const payload = getPersonalizedRecommendations(watchlist);
   res.status(200).json(payload);
 });
 
