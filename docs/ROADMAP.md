@@ -53,9 +53,9 @@ Exit criteria:
 
 Goal: improve UX, reliability, and observability.
 
-- [ ] Advanced search and filters
-- [ ] Error handling improvements and loading states
-- [ ] API validation and improved logging
+- [x] Advanced search and filters
+- [x] Error handling improvements and loading states
+- [x] API validation and improved logging
 - [ ] Analytics events and app metrics (optional)
 
 Exit criteria:

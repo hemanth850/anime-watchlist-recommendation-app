@@ -81,6 +81,20 @@ export type UpdateWatchlistItemRequest = {
   progressEpisodes?: number;
 };
 
+export type CatalogSort = "rating_desc" | "rating_asc" | "title_asc";
+
+export type CatalogQuery = {
+  q?: string;
+  genre?: string;
+  minRating?: number;
+  maxEpisodes?: number;
+  sort?: CatalogSort;
+};
+
+export type CatalogResponse = {
+  items: Anime[];
+};
+
 export const mockAnimeCatalog: Anime[] = [
   {
     id: "aot",
