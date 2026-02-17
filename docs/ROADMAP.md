@@ -41,10 +41,10 @@ Exit criteria:
 
 Goal: generate recommendations from user behavior.
 
-- [ ] Baseline recommendation algorithm
-- [ ] Recommendation API endpoints
-- [ ] Explainability metadata (why recommended)
-- [ ] Frontend recommendation views
+- [x] Baseline recommendation algorithm
+- [x] Recommendation API endpoints
+- [x] Explainability metadata (why recommended)
+- [x] Frontend recommendation views
 
 Exit criteria:
 - User sees recommendations that react to ratings/status history.
