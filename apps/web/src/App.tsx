@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import type {
+  Anime,
   AnimeStatus,
   AuthMeResponse,
   AuthSuccessResponse,
+  CatalogQuery,
+  CatalogResponse,
+  CatalogSort,
   CreateWatchlistItemRequest,
   HealthResponse,
   LoginRequest,
@@ -19,6 +23,7 @@ import { mockAnimeCatalog } from "@anime-app/shared";
 const apiBaseUrl = "http://localhost:4000";
 const tokenStorageKey = "anime_app_token";
 const statusOptions: AnimeStatus[] = ["plan", "watching", "completed", "dropped"];
+const catalogSortOptions: CatalogSort[] = ["rating_desc", "rating_asc", "title_asc"];
 
 type AuthMode = "login" | "signup";
 type WatchlistDraft = Record<
@@ -46,12 +51,36 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+function toCatalogQueryString(query: CatalogQuery): string {
+  const params = new URLSearchParams();
+  if (query.q && query.q.trim() !== "") {
+    params.set("q", query.q.trim());
+  }
+  if (query.genre && query.genre.trim() !== "") {
+    params.set("genre", query.genre.trim());
+  }
+  if (query.minRating !== undefined) {
+    params.set("minRating", String(query.minRating));
+  }
+  if (query.maxEpisodes !== undefined) {
+    params.set("maxEpisodes", String(query.maxEpisodes));
+  }
+  if (query.sort) {
+    params.set("sort", query.sort);
+  }
+  const asString = params.toString();
+  return asString ? `?${asString}` : "";
+}
+
 function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [recommendations, setRecommendations] =
     useState<RecommendationResponse | null>(null);
   const [personalizedRecommendations, setPersonalizedRecommendations] =
     useState<RecommendationResponse | null>(null);
+  const [catalogItems, setCatalogItems] = useState<Anime[]>([]);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -61,43 +90,61 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [baseError, setBaseError] = useState<string | null>(null);
   const [loadingAuth, setLoadingAuth] = useState(false);
+  const [loadingProtected, setLoadingProtected] = useState(false);
+  const [watchlistMutationLoading, setWatchlistMutationLoading] = useState(false);
   const [watchlist, setWatchlist] = useState<WatchlistEntry[]>([]);
   const [watchlistDrafts, setWatchlistDrafts] = useState<WatchlistDraft>({});
   const [watchlistError, setWatchlistError] = useState<string | null>(null);
   const [personalizedError, setPersonalizedError] = useState<string | null>(null);
-  const [selectedAnimeId, setSelectedAnimeId] = useState<string>(
-    mockAnimeCatalog[0]?.id ?? ""
-  );
+  const [selectedAnimeId, setSelectedAnimeId] = useState<string>("");
   const [selectedAnimeStatus, setSelectedAnimeStatus] = useState<AnimeStatus>("plan");
+  const [searchText, setSearchText] = useState("");
+  const [genreFilter, setGenreFilter] = useState("");
+  const [minRatingFilter, setMinRatingFilter] = useState("");
+  const [maxEpisodesFilter, setMaxEpisodesFilter] = useState("");
+  const [catalogSort, setCatalogSort] = useState<CatalogSort>("rating_desc");
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [healthRes, recRes] = await Promise.all([
-          fetchJson<HealthResponse>("/health"),
-          fetchJson<RecommendationResponse>("/recommendations/preview")
-        ]);
-        setHealth(healthRes);
-        setRecommendations(recRes);
-      } catch (loadError) {
-        const message =
-          loadError instanceof Error ? loadError.message : "Unknown error";
-        setBaseError(message);
-      }
-    };
+  const genreOptions = useMemo(
+    () =>
+      Array.from(new Set(mockAnimeCatalog.flatMap((anime) => anime.genres))).sort(
+        (a, b) => a.localeCompare(b)
+      ),
+    []
+  );
 
-    void load();
-  }, []);
+  const animeById = useMemo(
+    () =>
+      Object.fromEntries(
+        mockAnimeCatalog.map((anime) => [anime.id, anime] as const)
+      ),
+    []
+  );
 
   const authHeaders = useMemo(() => {
     if (!authToken) {
       return undefined;
     }
-
     return {
       Authorization: `Bearer ${authToken}`
     };
   }, [authToken]);
+
+  const loadCatalog = async (query: CatalogQuery) => {
+    setCatalogLoading(true);
+    setCatalogError(null);
+    try {
+      const path = `/catalog${toCatalogQueryString(query)}`;
+      const data = await fetchJson<CatalogResponse>(path);
+      setCatalogItems(data.items);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to load catalog";
+      setCatalogError(message);
+      setCatalogItems([]);
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
 
   const loadWatchlist = async (token: string) => {
     const data = await fetchJson<WatchlistResponse>("/watchlist", {
@@ -121,19 +168,58 @@ function App() {
   };
 
   const loadProtectedData = async (token: string) => {
-    await loadWatchlist(token);
+    setLoadingProtected(true);
     try {
-      await loadPersonalizedRecommendations(token);
-      setPersonalizedError(null);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to load personalized recommendations";
-      setPersonalizedError(message);
-      setPersonalizedRecommendations(null);
+      await loadWatchlist(token);
+      try {
+        await loadPersonalizedRecommendations(token);
+        setPersonalizedError(null);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to load personalized recommendations";
+        setPersonalizedError(message);
+        setPersonalizedRecommendations(null);
+      }
+    } finally {
+      setLoadingProtected(false);
     }
   };
+
+  useEffect(() => {
+    const loadPublicData = async () => {
+      try {
+        const [healthRes, recRes] = await Promise.all([
+          fetchJson<HealthResponse>("/health"),
+          fetchJson<RecommendationResponse>("/recommendations/preview")
+        ]);
+        setHealth(healthRes);
+        setRecommendations(recRes);
+      } catch (loadError) {
+        const message =
+          loadError instanceof Error ? loadError.message : "Unknown error";
+        setBaseError(message);
+      }
+    };
+
+    void loadPublicData();
+    void loadCatalog({ sort: "rating_desc" });
+  }, []);
+
+  useEffect(() => {
+    if (catalogItems.length === 0) {
+      setSelectedAnimeId("");
+      return;
+    }
+
+    setSelectedAnimeId((prev) => {
+      if (prev !== "" && catalogItems.some((anime) => anime.id === prev)) {
+        return prev;
+      }
+      return catalogItems[0]?.id ?? "";
+    });
+  }, [catalogItems]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem(tokenStorageKey);
@@ -178,7 +264,7 @@ function App() {
     }
 
     return recommendations.items.map((item) => {
-      const anime = mockAnimeCatalog.find((entry) => entry.id === item.animeId);
+      const anime = animeById[item.animeId];
       return {
         id: item.animeId,
         title: anime?.title ?? item.animeId,
@@ -186,21 +272,11 @@ function App() {
         reason: item.reason
       };
     });
-  }, [recommendations]);
-
-  const animeById = useMemo(
-    () =>
-      Object.fromEntries(
-        mockAnimeCatalog.map((anime) => [anime.id, anime] as const)
-      ),
-    []
-  );
+  }, [animeById, recommendations]);
 
   const updateDraft = (
     animeId: string,
-    updater: (
-      current: WatchlistDraft[string]
-    ) => WatchlistDraft[string]
+    updater: (current: WatchlistDraft[string]) => WatchlistDraft[string]
   ) => {
     setWatchlistDrafts((prev) => {
       const current = prev[animeId];
@@ -213,6 +289,45 @@ function App() {
         [animeId]: updater(current)
       };
     });
+  };
+
+  const handleCatalogFilterSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const minRating =
+      minRatingFilter.trim() === ""
+        ? undefined
+        : Number.parseFloat(minRatingFilter.trim());
+    if (minRating !== undefined && Number.isNaN(minRating)) {
+      setCatalogError("Min rating must be a number between 0 and 10");
+      return;
+    }
+
+    const maxEpisodes =
+      maxEpisodesFilter.trim() === ""
+        ? undefined
+        : Number.parseInt(maxEpisodesFilter.trim(), 10);
+    if (maxEpisodes !== undefined && (!Number.isInteger(maxEpisodes) || maxEpisodes <= 0)) {
+      setCatalogError("Max episodes must be a positive integer");
+      return;
+    }
+
+    await loadCatalog({
+      q: searchText,
+      genre: genreFilter || undefined,
+      minRating,
+      maxEpisodes,
+      sort: catalogSort
+    });
+  };
+
+  const handleResetCatalogFilters = async () => {
+    setSearchText("");
+    setGenreFilter("");
+    setMinRatingFilter("");
+    setMaxEpisodesFilter("");
+    setCatalogSort("rating_desc");
+    await loadCatalog({ sort: "rating_desc" });
   };
 
   const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -251,7 +366,7 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      if (authToken) {
+      if (authToken && authHeaders) {
         await fetchJson<{ message: string }>("/auth/logout", {
           method: "POST",
           headers: authHeaders
@@ -272,7 +387,7 @@ function App() {
 
   const handleAddToWatchlist = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!authHeaders) {
+    if (!authHeaders || !authToken) {
       return;
     }
     if (!selectedAnimeId) {
@@ -280,6 +395,7 @@ function App() {
       return;
     }
 
+    setWatchlistMutationLoading(true);
     setWatchlistError(null);
     try {
       const payload: CreateWatchlistItemRequest = {
@@ -294,16 +410,18 @@ function App() {
         },
         body: JSON.stringify(payload)
       });
-      await loadProtectedData(authToken!);
+      await loadProtectedData(authToken);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to add watchlist item";
       setWatchlistError(message);
+    } finally {
+      setWatchlistMutationLoading(false);
     }
   };
 
   const handleUpdateWatchlistItem = async (animeId: string) => {
-    if (!authHeaders) {
+    if (!authHeaders || !authToken) {
       return;
     }
 
@@ -319,6 +437,7 @@ function App() {
       return;
     }
 
+    setWatchlistMutationLoading(true);
     setWatchlistError(null);
     try {
       const payload: UpdateWatchlistItemRequest = {
@@ -335,30 +454,35 @@ function App() {
         },
         body: JSON.stringify(payload)
       });
-      await loadProtectedData(authToken!);
+      await loadProtectedData(authToken);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to update watchlist item";
       setWatchlistError(message);
+    } finally {
+      setWatchlistMutationLoading(false);
     }
   };
 
   const handleDeleteWatchlistItem = async (animeId: string) => {
-    if (!authHeaders) {
+    if (!authHeaders || !authToken) {
       return;
     }
 
+    setWatchlistMutationLoading(true);
     setWatchlistError(null);
     try {
       await fetchJson<void>(`/watchlist/${animeId}`, {
         method: "DELETE",
         headers: authHeaders
       });
-      await loadProtectedData(authToken!);
+      await loadProtectedData(authToken);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to delete watchlist item";
       setWatchlistError(message);
+    } finally {
+      setWatchlistMutationLoading(false);
     }
   };
 
@@ -368,7 +492,8 @@ function App() {
         <p className="eyebrow">Anime Watchlist Platform</p>
         <h1>Track what you watch and discover what to watch next.</h1>
         <p className="subtitle">
-          Phase 3 adds watchlist CRUD with status transitions, ratings, and notes.
+          Phase 5 improves discovery with search/filters and improves loading/error
+          handling across protected flows.
         </p>
       </section>
 
@@ -454,11 +579,92 @@ function App() {
           <p>
             Logged in as <strong>{authUser.username}</strong> ({authUser.email})
           </p>
+          {loadingProtected && <p>Refreshing private data...</p>}
           <button type="button" onClick={handleLogout}>
             Logout
           </button>
         </section>
       )}
+
+      <section className="panel">
+        <h2>Discover Anime</h2>
+        <form className="catalog-filter-form" onSubmit={handleCatalogFilterSubmit}>
+          <label>
+            Search Title
+            <input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="e.g. Titan"
+            />
+          </label>
+          <label>
+            Genre
+            <select
+              value={genreFilter}
+              onChange={(event) => setGenreFilter(event.target.value)}
+            >
+              <option value="">All genres</option>
+              {genreOptions.map((genre) => (
+                <option key={genre} value={genre}>
+                  {genre}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Min Rating
+            <input
+              type="number"
+              min={0}
+              max={10}
+              step={0.1}
+              value={minRatingFilter}
+              onChange={(event) => setMinRatingFilter(event.target.value)}
+            />
+          </label>
+          <label>
+            Max Episodes
+            <input
+              type="number"
+              min={1}
+              value={maxEpisodesFilter}
+              onChange={(event) => setMaxEpisodesFilter(event.target.value)}
+            />
+          </label>
+          <label>
+            Sort
+            <select
+              value={catalogSort}
+              onChange={(event) => setCatalogSort(event.target.value as CatalogSort)}
+            >
+              {catalogSortOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="catalog-filter-actions">
+            <button type="submit" disabled={catalogLoading}>
+              {catalogLoading ? "Searching..." : "Apply Filters"}
+            </button>
+            <button
+              className="secondary-btn"
+              type="button"
+              onClick={() => {
+                void handleResetCatalogFilters();
+              }}
+              disabled={catalogLoading}
+            >
+              Reset
+            </button>
+          </div>
+        </form>
+
+        {catalogError && <p className="error">{catalogError}</p>}
+        {!catalogError && catalogLoading && <p>Loading catalog...</p>}
+        {!catalogLoading && <p>{catalogItems.length} result(s) in catalog.</p>}
+      </section>
 
       {authUser && (
         <section className="panel">
@@ -472,7 +678,7 @@ function App() {
                 value={selectedAnimeId}
                 onChange={(event) => setSelectedAnimeId(event.target.value)}
               >
-                {mockAnimeCatalog.map((anime) => (
+                {catalogItems.map((anime) => (
                   <option key={anime.id} value={anime.id}>
                     {anime.title}
                   </option>
@@ -494,7 +700,9 @@ function App() {
                 ))}
               </select>
             </label>
-            <button type="submit">Add to Watchlist</button>
+            <button type="submit" disabled={watchlistMutationLoading || selectedAnimeId === ""}>
+              {watchlistMutationLoading ? "Saving..." : "Add to Watchlist"}
+            </button>
           </form>
 
           {watchlist.length === 0 && (
@@ -584,13 +792,22 @@ function App() {
                   </label>
 
                   <div className="watchlist-actions">
-                    <button type="button" onClick={() => handleUpdateWatchlistItem(item.animeId)}>
-                      Save Changes
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleUpdateWatchlistItem(item.animeId);
+                      }}
+                      disabled={watchlistMutationLoading}
+                    >
+                      {watchlistMutationLoading ? "Saving..." : "Save Changes"}
                     </button>
                     <button
                       className="secondary-btn"
                       type="button"
-                      onClick={() => handleDeleteWatchlistItem(item.animeId)}
+                      onClick={() => {
+                        void handleDeleteWatchlistItem(item.animeId);
+                      }}
+                      disabled={watchlistMutationLoading}
                     >
                       Remove
                     </button>
@@ -624,7 +841,7 @@ function App() {
           <p>Loading personalized recommendations...</p>
         )}
         {authUser && personalizedRecommendations && personalizedRecommendations.items.length === 0 && (
-          <p>No unseen titles available yet. Expand the anime catalog in Phase 5.</p>
+          <p>No unseen titles available yet. Expand the anime catalog in a later phase.</p>
         )}
         {authUser && personalizedRecommendations && personalizedRecommendations.items.length > 0 && (
           <ul className="recommendation-list">
@@ -646,3 +863,4 @@ function App() {
 }
 
 export default App;
+

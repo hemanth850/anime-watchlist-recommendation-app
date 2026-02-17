@@ -1,26 +1,27 @@
 import cors from "cors";
 import express from "express";
+import bcrypt from "bcryptjs";
 import {
+  type Anime,
+  type AnimeStatus,
   type AuthMeResponse,
   type AuthSuccessResponse,
+  type CatalogQuery,
+  type CatalogResponse,
   type CreateWatchlistItemRequest,
+  type HealthResponse,
   type LoginRequest,
+  type RecommendationResponse,
   type SignupRequest,
   type UpdateWatchlistItemRequest,
   type WatchlistResponse,
-  mockAnimeCatalog,
-  type AnimeStatus,
-  type HealthResponse,
-  type RecommendationResponse
+  mockAnimeCatalog
 } from "@anime-app/shared";
-import bcrypt from "bcryptjs";
 import { authRequired } from "./auth/middleware.js";
-import {
-  createUser,
-  findUserByEmail,
-  toPublicUser
-} from "./auth/store.js";
 import { signSessionToken } from "./auth/session.js";
+import { createUser, findUserByEmail, toPublicUser } from "./auth/store.js";
+import { requestLogger } from "./middleware/logging.js";
+import { getPersonalizedRecommendations } from "./recommendations/engine.js";
 import {
   addWatchlistItem,
   getUserWatchlist,
@@ -28,12 +29,20 @@ import {
   removeWatchlistItem,
   updateWatchlistItem
 } from "./watchlist/store.js";
-import { getPersonalizedRecommendations } from "./recommendations/engine.js";
+import {
+  isValidEmail,
+  isValidRating,
+  isValidStatus,
+  parseCatalogSort,
+  parseFloatOrNull,
+  parsePositiveInt
+} from "./utils/validation.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger);
 
 app.post("/auth/signup", async (req, res) => {
   const body = req.body as Partial<SignupRequest>;
@@ -43,6 +52,11 @@ app.post("/auth/signup", async (req, res) => {
 
   if (!email || !username || !password) {
     res.status(400).json({ message: "email, username, and password are required" });
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    res.status(400).json({ message: "invalid email format" });
     return;
   }
 
@@ -75,6 +89,11 @@ app.post("/auth/login", async (req, res) => {
 
   if (!email || !password) {
     res.status(400).json({ message: "email and password are required" });
+    return;
+  }
+
+  if (!isValidEmail(email)) {
+    res.status(400).json({ message: "invalid email format" });
     return;
   }
 
@@ -114,6 +133,59 @@ app.get("/auth/me", authRequired, (req, res) => {
 
 app.post("/auth/logout", (_req, res) => {
   res.status(200).json({ message: "logout successful" });
+});
+
+app.get("/catalog", (req, res) => {
+  const query = req.query as Partial<Record<keyof CatalogQuery, string>>;
+  const q = query.q?.trim().toLowerCase() ?? "";
+  const genre = query.genre?.trim().toLowerCase() ?? "";
+  const minRatingRaw = query.minRating;
+  const maxEpisodesRaw = query.maxEpisodes;
+  const sort = parseCatalogSort(query.sort);
+
+  let minRating = 0;
+  if (minRatingRaw !== undefined) {
+    const parsed = parseFloatOrNull(minRatingRaw);
+    if (parsed === null || !isValidRating(parsed)) {
+      res.status(400).json({ message: "minRating must be a number between 0 and 10" });
+      return;
+    }
+    minRating = parsed;
+  }
+
+  let maxEpisodes = Number.MAX_SAFE_INTEGER;
+  if (maxEpisodesRaw !== undefined) {
+    const parsed = parsePositiveInt(maxEpisodesRaw);
+    if (parsed === null || parsed === 0) {
+      res.status(400).json({ message: "maxEpisodes must be a positive integer" });
+      return;
+    }
+    maxEpisodes = parsed;
+  }
+
+  const filtered = mockAnimeCatalog
+    .filter((anime) => {
+      const matchesQuery = q === "" || anime.title.toLowerCase().includes(q);
+      const matchesGenre =
+        genre === "" || anime.genres.some((entry) => entry.toLowerCase() === genre);
+      const matchesRating = anime.rating >= minRating;
+      const matchesEpisodes = anime.episodes <= maxEpisodes;
+      return matchesQuery && matchesGenre && matchesRating && matchesEpisodes;
+    })
+    .sort((a, b) => {
+      if (sort === "rating_asc") {
+        return a.rating - b.rating;
+      }
+      if (sort === "title_asc") {
+        return a.title.localeCompare(b.title);
+      }
+      return b.rating - a.rating;
+    });
+
+  const payload: CatalogResponse = {
+    items: filtered
+  };
+  res.status(200).json(payload);
 });
 
 app.get("/watchlist", authRequired, (req, res) => {
@@ -156,7 +228,7 @@ app.post("/watchlist", authRequired, (req, res) => {
     return;
   }
 
-  if (!["plan", "watching", "completed", "dropped"].includes(status)) {
+  if (!isValidStatus(status)) {
     res.status(400).json({ message: "invalid status value" });
     return;
   }
@@ -207,7 +279,7 @@ app.patch("/watchlist/:animeId", authRequired, (req, res) => {
   }> = {};
 
   if (body.status !== undefined) {
-    if (!["plan", "watching", "completed", "dropped"].includes(body.status)) {
+    if (!isValidStatus(body.status)) {
       res.status(400).json({ message: "invalid status value" });
       return;
     }
@@ -215,7 +287,7 @@ app.patch("/watchlist/:animeId", authRequired, (req, res) => {
   }
 
   if (body.rating !== undefined) {
-    if (body.rating !== null && (body.rating < 0 || body.rating > 10)) {
+    if (body.rating !== null && !isValidRating(body.rating)) {
       res.status(400).json({ message: "rating must be between 0 and 10" });
       return;
     }
@@ -287,4 +359,21 @@ app.get("/recommendations/preview", (_req, res) => {
   res.status(200).json(payload);
 });
 
+app.use((_req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
+
+app.use(
+  (
+    error: unknown,
+    req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    console.error(`[api] unhandled error on ${req.method} ${req.originalUrl}`, error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+);
+
 export { app };
+

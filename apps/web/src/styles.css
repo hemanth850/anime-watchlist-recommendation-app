@@ -117,10 +117,27 @@ button:disabled {
   margin-bottom: 1rem;
 }
 
+.catalog-filter-form {
+  display: grid;
+  gap: 0.8rem;
+}
+
 .watchlist-add-form label {
   display: grid;
   gap: 0.35rem;
   font-weight: 600;
+}
+
+.catalog-filter-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.catalog-filter-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .watchlist-grid {
