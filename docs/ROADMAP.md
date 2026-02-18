@@ -65,10 +65,10 @@ Exit criteria:
 
 Goal: production-ready workflow and GitHub release.
 
-- [ ] Unit/integration/e2e test coverage baseline
-- [ ] GitHub Actions CI (lint + typecheck + tests + build)
-- [ ] Deployment configs (web + API)
-- [ ] Release notes and version tag
+- [x] Unit/integration/e2e test coverage baseline
+- [x] GitHub Actions CI (lint + typecheck + tests + build)
+- [x] Deployment configs (web + API)
+- [x] Release notes and version tag
 
 Exit criteria:
 - Tagged release on GitHub with deployment instructions and changelog.
