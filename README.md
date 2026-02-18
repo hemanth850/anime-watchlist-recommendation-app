@@ -4,7 +4,7 @@ Full-stack web app to track anime, manage a watchlist, rate completed shows, and
 
 ## Project Status
 
-Current phase: `Phase 5 - Quality and Product Polish`
+Current phase: `Phase 6 - Release`
 
 See `docs/ROADMAP.md` for full phase plan from MVP to GitHub release.
 
@@ -52,6 +52,8 @@ npm run dev
 - `npm run dev` - run web and API together
 - `npm run dev:web` - run frontend only
 - `npm run dev:api` - run backend only
+- `npm run lint` - run ESLint across workspaces
+- `npm run test` - run API unit/integration/e2e test suite
 - `npm run build` - build all workspaces
 - `npm run typecheck` - run TypeScript checks
 
@@ -79,6 +81,13 @@ npm run dev
 - `GET /catalog?q=&genre=&minRating=&maxEpisodes=&sort=`
 - Supported `sort`: `rating_desc`, `rating_asc`, `title_asc`
 
+## CI/CD and Release
+
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Deployment guide: `docs/DEPLOYMENT.md`
+- Release checklist: `docs/RELEASE.md`
+- Changelog: `CHANGELOG.md`
+
 Local demo account:
 - Email: `demo@anime.app`
 - Password: `password123`
@@ -90,4 +99,4 @@ Local demo account:
 - Phase 3: Watchlist CRUD + ratings (completed baseline)
 - Phase 4: Recommendation engine (completed baseline)
 - Phase 5: Search/discovery UX and polish (completed baseline)
-- Phase 6: Test hardening, CI/CD, docs, and GitHub release
+- Phase 6: Test hardening, CI/CD, docs, and GitHub release (completed baseline)

@@ -2,7 +2,6 @@ import cors from "cors";
 import express from "express";
 import bcrypt from "bcryptjs";
 import {
-  type Anime,
   type AnimeStatus,
   type AuthMeResponse,
   type AuthSuccessResponse,
@@ -368,12 +367,12 @@ app.use(
     error: unknown,
     req: express.Request,
     res: express.Response,
-    _next: express.NextFunction
+    next: express.NextFunction
   ) => {
+    void next;
     console.error(`[api] unhandled error on ${req.method} ${req.originalUrl}`, error);
     res.status(500).json({ message: "Internal server error" });
   }
 );
 
 export { app };
-

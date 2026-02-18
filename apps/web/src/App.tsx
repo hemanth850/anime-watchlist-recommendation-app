@@ -20,7 +20,7 @@ import type {
 } from "@anime-app/shared";
 import { mockAnimeCatalog } from "@anime-app/shared";
 
-const apiBaseUrl = "http://localhost:4000";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 const tokenStorageKey = "anime_app_token";
 const statusOptions: AnimeStatus[] = ["plan", "watching", "completed", "dropped"];
 const catalogSortOptions: CatalogSort[] = ["rating_desc", "rating_asc", "title_asc"];
@@ -243,6 +243,7 @@ function App() {
     };
 
     void bootstrapSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -492,8 +493,8 @@ function App() {
         <p className="eyebrow">Anime Watchlist Platform</p>
         <h1>Track what you watch and discover what to watch next.</h1>
         <p className="subtitle">
-          Phase 5 improves discovery with search/filters and improves loading/error
-          handling across protected flows.
+          Phase 6 focuses on release readiness with CI, tests, and deployment support
+          on top of discovery and recommendation features.
         </p>
       </section>
 
@@ -863,4 +864,3 @@ function App() {
 }
 
 export default App;
-
