@@ -478,8 +478,12 @@ function App() {
   };
 
   return (
-    <main className="page">
-      <section className="hero">
+    <main className="page-shell">
+      <div className="ambient ambient-a" aria-hidden="true" />
+      <div className="ambient ambient-b" aria-hidden="true" />
+      <div className="ambient ambient-c" aria-hidden="true" />
+
+      <section className="hero glass">
         <p className="eyebrow">Anime Watchlist Platform</p>
         <h1>Track what you watch and discover what to watch next.</h1>
         <p className="subtitle">
@@ -488,7 +492,7 @@ function App() {
         </p>
       </section>
 
-      <section className="panel">
+      <section className="panel glass">
         <h2>API Status</h2>
         {baseError && <p className="error">Connection issue: {baseError}</p>}
         {!baseError && !health && <p>Loading API health...</p>}
@@ -501,7 +505,7 @@ function App() {
       </section>
 
       {!authUser ? (
-        <section className="panel">
+        <section className="panel glass">
           <h2>{authMode === "signup" ? "Create Account" : "Login"}</h2>
           <form className="auth-form" onSubmit={handleAuthSubmit}>
             <label>
@@ -565,7 +569,7 @@ function App() {
           </p>
         </section>
       ) : (
-        <section className="panel">
+        <section className="panel glass">
           <h2>Account</h2>
           <p>
             Logged in as <strong>{authUser.username}</strong> ({authUser.email})
@@ -577,7 +581,7 @@ function App() {
         </section>
       )}
 
-      <section className="panel">
+      <section className="panel glass">
         <h2>Discover Anime</h2>
         <form className="catalog-filter-form" onSubmit={handleCatalogFilterSubmit}>
           <label>
@@ -658,7 +662,7 @@ function App() {
       </section>
 
       {authUser && (
-        <section className="panel">
+        <section className="panel glass">
           <h2>Your Watchlist</h2>
           {watchlistError && <p className="error">{watchlistError}</p>}
 
@@ -809,7 +813,7 @@ function App() {
         </section>
       )}
 
-      <section className="panel">
+      <section className="panel glass">
         <h2>Recommendation Preview</h2>
         {!recommendations && !baseError && <p>Loading recommendations...</p>}
         <ul className="recommendation-list">
@@ -823,7 +827,7 @@ function App() {
         </ul>
       </section>
 
-      <section className="panel">
+      <section className="panel glass">
         <h2>Personalized Recommendations</h2>
         {!authUser && <p>Login to see recommendations based on your watchlist activity.</p>}
         {authUser && personalizedError && <p className="error">{personalizedError}</p>}
