@@ -25,6 +25,7 @@ docs/
 - Frontend: React, TypeScript, Vite
 - Backend: Node.js, Express, TypeScript
 - Shared: Local workspace package for shared app types
+- Anime data provider: Jikan API (MyAnimeList data)
 - Build: TypeScript project references
 
 ## Getting Started
@@ -80,6 +81,7 @@ npm run dev
 
 - `GET /catalog?q=&genre=&minRating=&maxEpisodes=&sort=`
 - Supported `sort`: `rating_desc`, `rating_asc`, `title_asc`
+- `animeId` values now map to MyAnimeList IDs from Jikan
 
 ## CI/CD and Release
 

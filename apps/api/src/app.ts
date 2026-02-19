@@ -13,14 +13,14 @@ import {
   type RecommendationResponse,
   type SignupRequest,
   type UpdateWatchlistItemRequest,
-  type WatchlistResponse,
-  mockAnimeCatalog
+  type WatchlistResponse
 } from "@anime-app/shared";
 import { authRequired } from "./auth/middleware.js";
 import { signSessionToken } from "./auth/session.js";
 import { createUser, findUserByEmail, toPublicUser } from "./auth/store.js";
 import { requestLogger } from "./middleware/logging.js";
 import { getPersonalizedRecommendations } from "./recommendations/engine.js";
+import { getAnimeById, searchJikanCatalog } from "./catalog/jikan.js";
 import {
   addWatchlistItem,
   getUserWatchlist,
@@ -134,10 +134,10 @@ app.post("/auth/logout", (_req, res) => {
   res.status(200).json({ message: "logout successful" });
 });
 
-app.get("/catalog", (req, res) => {
+app.get("/catalog", async (req, res) => {
   const query = req.query as Partial<Record<keyof CatalogQuery, string>>;
-  const q = query.q?.trim().toLowerCase() ?? "";
-  const genre = query.genre?.trim().toLowerCase() ?? "";
+  const q = query.q?.trim() ?? "";
+  const genre = query.genre?.trim() ?? "";
   const minRatingRaw = query.minRating;
   const maxEpisodesRaw = query.maxEpisodes;
   const sort = parseCatalogSort(query.sort);
@@ -162,24 +162,22 @@ app.get("/catalog", (req, res) => {
     maxEpisodes = parsed;
   }
 
-  const filtered = mockAnimeCatalog
-    .filter((anime) => {
-      const matchesQuery = q === "" || anime.title.toLowerCase().includes(q);
-      const matchesGenre =
-        genre === "" || anime.genres.some((entry) => entry.toLowerCase() === genre);
-      const matchesRating = anime.rating >= minRating;
-      const matchesEpisodes = anime.episodes <= maxEpisodes;
-      return matchesQuery && matchesGenre && matchesRating && matchesEpisodes;
-    })
-    .sort((a, b) => {
-      if (sort === "rating_asc") {
-        return a.rating - b.rating;
-      }
-      if (sort === "title_asc") {
-        return a.title.localeCompare(b.title);
-      }
-      return b.rating - a.rating;
-    });
+  const catalogQuery: CatalogQuery = {
+    q: q === "" ? undefined : q,
+    genre: genre === "" ? undefined : genre,
+    minRating,
+    maxEpisodes,
+    sort
+  };
+
+  let filtered;
+  try {
+    filtered = await searchJikanCatalog(catalogQuery);
+  } catch (error) {
+    console.error("[catalog] provider failure", error);
+    res.status(503).json({ message: "Catalog provider is temporarily unavailable" });
+    return;
+  }
 
   const payload: CatalogResponse = {
     items: filtered
@@ -200,7 +198,7 @@ app.get("/watchlist", authRequired, (req, res) => {
   res.status(200).json(payload);
 });
 
-app.get("/recommendations/personalized", authRequired, (req, res) => {
+app.get("/recommendations/personalized", authRequired, async (req, res) => {
   const user = req.authUser;
   if (!user) {
     res.status(401).json({ message: "unauthorized" });
@@ -208,11 +206,21 @@ app.get("/recommendations/personalized", authRequired, (req, res) => {
   }
 
   const watchlist = getUserWatchlist(user.id);
-  const payload = getPersonalizedRecommendations(watchlist);
+  let candidateCatalog;
+  try {
+    candidateCatalog = await searchJikanCatalog({
+      sort: "rating_desc"
+    });
+  } catch (error) {
+    console.error("[recommendations] provider failure", error);
+    res.status(503).json({ message: "Recommendation provider is temporarily unavailable" });
+    return;
+  }
+  const payload = getPersonalizedRecommendations(watchlist, candidateCatalog);
   res.status(200).json(payload);
 });
 
-app.post("/watchlist", authRequired, (req, res) => {
+app.post("/watchlist", authRequired, async (req, res) => {
   const user = req.authUser;
   if (!user) {
     res.status(401).json({ message: "unauthorized" });
@@ -232,8 +240,8 @@ app.post("/watchlist", authRequired, (req, res) => {
     return;
   }
 
-  const animeExists = mockAnimeCatalog.some((anime) => anime.id === animeId);
-  if (!animeExists) {
+  const anime = await getAnimeById(animeId);
+  if (!anime) {
     res.status(404).json({ message: "anime not found in catalog" });
     return;
   }
@@ -246,6 +254,9 @@ app.post("/watchlist", authRequired, (req, res) => {
   const item = addWatchlistItem({
     userId: user.id,
     animeId,
+    animeTitle: anime.title,
+    animeGenres: anime.genres,
+    animeEpisodes: anime.episodes,
     status
   });
   res.status(201).json(item);
@@ -346,10 +357,19 @@ app.get("/health", (_req, res) => {
   res.status(200).json(payload);
 });
 
-app.get("/recommendations/preview", (_req, res) => {
+app.get("/recommendations/preview", async (_req, res) => {
+  let catalog;
+  try {
+    catalog = await searchJikanCatalog({ sort: "rating_desc" });
+  } catch (error) {
+    console.error("[recommendations-preview] provider failure", error);
+    res.status(503).json({ message: "Recommendation provider is temporarily unavailable" });
+    return;
+  }
   const payload: RecommendationResponse = {
-    items: mockAnimeCatalog.slice(0, 3).map((anime) => ({
+    items: catalog.slice(0, 3).map((anime) => ({
       animeId: anime.id,
+      animeTitle: anime.title,
       score: anime.rating,
       reason: "Popular in the community and strong genre overlap"
     }))
