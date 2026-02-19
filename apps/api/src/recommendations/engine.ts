@@ -1,10 +1,9 @@
-import {
-  mockAnimeCatalog,
-  type Anime,
-  type AnimeStatus,
-  type RecommendationItem,
-  type RecommendationResponse,
-  type WatchlistEntry
+import type {
+  Anime,
+  AnimeStatus,
+  RecommendationItem,
+  RecommendationResponse,
+  WatchlistEntry
 } from "@anime-app/shared";
 
 const statusWeights: Record<AnimeStatus, number> = {
@@ -18,16 +17,10 @@ function buildGenrePreferenceScores(watchlist: WatchlistEntry[]): Map<string, nu
   const genreScores = new Map<string, number>();
 
   for (const item of watchlist) {
-    const anime = mockAnimeCatalog.find((entry) => entry.id === item.animeId);
-    if (!anime) {
-      continue;
-    }
-
-    const ratingAdjustment =
-      item.rating === null ? 0 : (item.rating - 5) / 5;
+    const ratingAdjustment = item.rating === null ? 0 : (item.rating - 5) / 5;
     const entryWeight = statusWeights[item.status] + ratingAdjustment;
 
-    for (const genre of anime.genres) {
+    for (const genre of item.animeGenres) {
       genreScores.set(genre, (genreScores.get(genre) ?? 0) + entryWeight);
     }
   }
@@ -41,7 +34,7 @@ function reasonForRecommendation(
   hasSignals: boolean
 ): string {
   if (!hasSignals) {
-    return "Great community rating. Add more watchlist activity for personalized matches.";
+    return "Strong public rating. Add watchlist activity to improve personalization.";
   }
 
   const rankedGenres = anime.genres
@@ -52,35 +45,39 @@ function reasonForRecommendation(
     .map((entry) => entry.genre);
 
   if (rankedGenres.length > 0) {
-    return `Recommended due to your interest in ${rankedGenres.join(" and ")}.`;
+    return `Matches your genre preferences: ${rankedGenres.join(" and ")}.`;
   }
 
-  return "Recommended based on strong overall rating while we learn more from your list.";
+  return "Good overall match from your recent watchlist behavior.";
 }
 
-function getPersonalizedRecommendations(watchlist: WatchlistEntry[]): RecommendationResponse {
+function getPersonalizedRecommendations(
+  watchlist: WatchlistEntry[],
+  candidateCatalog: Anime[]
+): RecommendationResponse {
   const watchedAnimeIds = new Set(watchlist.map((item) => item.animeId));
   const genreScores = buildGenrePreferenceScores(watchlist);
   const hasSignals = watchlist.length > 0;
 
-  const candidateItems: RecommendationItem[] = mockAnimeCatalog
+  const candidateItems: RecommendationItem[] = candidateCatalog
     .filter((anime) => !watchedAnimeIds.has(anime.id))
     .map((anime) => {
       const genreMatchScore = anime.genres.reduce(
         (sum, genre) => sum + (genreScores.get(genre) ?? 0),
         0
       );
-      const catalogQualityScore = anime.rating / 10;
-      const totalScore = Number((catalogQualityScore + genreMatchScore).toFixed(3));
+      const qualityScore = anime.rating / 10;
+      const totalScore = Number((qualityScore + genreMatchScore).toFixed(3));
 
       return {
         animeId: anime.id,
+        animeTitle: anime.title,
         score: totalScore,
         reason: reasonForRecommendation(anime, genreScores, hasSignals)
       };
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, 6);
+    .slice(0, 8);
 
   return { items: candidateItems };
 }

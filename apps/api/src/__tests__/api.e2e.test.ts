@@ -1,12 +1,29 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { AddressInfo } from "node:net";
-import { app } from "../app.js";
+import type { Server } from "node:http";
+import type { Express } from "express";
+
+vi.mock("../catalog/jikan.js", () => {
+  const catalog = [
+    { id: "100", title: "Mock Titan", genres: ["Action", "Drama"], episodes: 25, rating: 9.1 },
+    { id: "101", title: "Mock Frieren", genres: ["Adventure", "Fantasy"], episodes: 28, rating: 8.9 }
+  ];
+
+  return {
+    getAnimeById: async (animeId: string) => catalog.find((entry) => entry.id === animeId) ?? null,
+    searchJikanCatalog: async () => catalog
+  };
+});
+
+let app: Express;
 
 describe("api e2e smoke", () => {
-  let server: ReturnType<typeof app.listen>;
+  let server: Server;
   let baseUrl = "";
 
   beforeAll(async () => {
+    const module = await import("../app.js");
+    app = module.app;
     server = app.listen(0);
     await new Promise<void>((resolve) => {
       server.once("listening", () => resolve());
@@ -37,4 +54,3 @@ describe("api e2e smoke", () => {
     expect(payload.items.length).toBeGreaterThan(0);
   });
 });
-

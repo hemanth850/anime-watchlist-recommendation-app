@@ -18,7 +18,6 @@ import type {
   WatchlistEntry,
   WatchlistResponse
 } from "@anime-app/shared";
-import { mockAnimeCatalog } from "@anime-app/shared";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 const tokenStorageKey = "anime_app_token";
@@ -106,18 +105,10 @@ function App() {
 
   const genreOptions = useMemo(
     () =>
-      Array.from(new Set(mockAnimeCatalog.flatMap((anime) => anime.genres))).sort(
+      Array.from(new Set(catalogItems.flatMap((anime) => anime.genres))).sort(
         (a, b) => a.localeCompare(b)
       ),
-    []
-  );
-
-  const animeById = useMemo(
-    () =>
-      Object.fromEntries(
-        mockAnimeCatalog.map((anime) => [anime.id, anime] as const)
-      ),
-    []
+    [catalogItems]
   );
 
   const authHeaders = useMemo(() => {
@@ -265,15 +256,14 @@ function App() {
     }
 
     return recommendations.items.map((item) => {
-      const anime = animeById[item.animeId];
       return {
         id: item.animeId,
-        title: anime?.title ?? item.animeId,
+        title: item.animeTitle,
         score: item.score,
         reason: item.reason
       };
     });
-  }, [animeById, recommendations]);
+  }, [recommendations]);
 
   const updateDraft = (
     animeId: string,
@@ -712,7 +702,6 @@ function App() {
 
           <ul className="watchlist-grid">
             {watchlist.map((item) => {
-              const anime = animeById[item.animeId];
               const draft = watchlistDrafts[item.animeId];
               if (!draft) {
                 return null;
@@ -720,10 +709,10 @@ function App() {
 
               return (
                 <li key={item.animeId} className="watchlist-card">
-                  <h3>{anime?.title ?? item.animeId}</h3>
+                  <h3>{item.animeTitle}</h3>
                   <p className="watchlist-meta">
-                    Episodes: {anime?.episodes ?? "-"} | Genres:{" "}
-                    {anime?.genres.join(", ") ?? "-"}
+                    Episodes: {item.animeEpisodes || "-"} | Genres:{" "}
+                    {item.animeGenres.join(", ") || "-"}
                   </p>
 
                   <label>
@@ -847,10 +836,9 @@ function App() {
         {authUser && personalizedRecommendations && personalizedRecommendations.items.length > 0 && (
           <ul className="recommendation-list">
             {personalizedRecommendations.items.map((item) => {
-              const anime = animeById[item.animeId];
               return (
                 <li key={`personalized-${item.animeId}`}>
-                  <h3>{anime?.title ?? item.animeId}</h3>
+                  <h3>{item.animeTitle}</h3>
                   <p>Score: {item.score.toFixed(2)}</p>
                   <p>{item.reason}</p>
                 </li>
