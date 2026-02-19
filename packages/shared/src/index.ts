@@ -10,6 +10,7 @@ export type Anime = {
 
 export type RecommendationItem = {
   animeId: string;
+  animeTitle: string;
   score: number;
   reason: string;
 };
@@ -58,6 +59,9 @@ export type AuthErrorResponse = {
 export type WatchlistEntry = {
   userId: string;
   animeId: string;
+  animeTitle: string;
+  animeGenres: string[];
+  animeEpisodes: number;
   status: AnimeStatus;
   rating: number | null;
   notes: string;

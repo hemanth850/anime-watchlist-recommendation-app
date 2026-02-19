@@ -20,12 +20,18 @@ function getWatchlistItem(userId: string, animeId: string): WatchlistEntry | nul
 function addWatchlistItem(params: {
   userId: string;
   animeId: string;
+  animeTitle: string;
+  animeGenres: string[];
+  animeEpisodes: number;
   status: AnimeStatus;
 }): WatchlistEntry {
   const watchlist = watchlistsByUserId.get(params.userId) ?? new Map();
   const item: WatchlistEntry = {
     userId: params.userId,
     animeId: params.animeId,
+    animeTitle: params.animeTitle,
+    animeGenres: params.animeGenres,
+    animeEpisodes: params.animeEpisodes,
     status: params.status,
     rating: null,
     notes: "",
@@ -79,4 +85,3 @@ export {
   removeWatchlistItem,
   updateWatchlistItem
 };
-
