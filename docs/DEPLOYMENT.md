@@ -25,6 +25,7 @@ npm run start -w @anime-app/api
 - Required env:
   - `PORT`
   - `SESSION_SECRET`
+  - `DATABASE_PATH` (SQLite file path)
 
 ### Web Service
 - Build command:
@@ -37,4 +38,3 @@ npm run preview -w @anime-app/web -- --host 0.0.0.0 --port 5173
 ```
 - Required env at build time:
   - `VITE_API_BASE_URL` (public API URL)
-

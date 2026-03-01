@@ -7,4 +7,5 @@ build/
 coverage/
 .DS_Store
 *.log
-
+apps/api/data/*.db
+apps/api/data/*.db-*

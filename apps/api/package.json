@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "db:migrate": "tsx src/db/migrate.ts",
     "lint": "eslint . --ext .ts --max-warnings=0",
     "test": "vitest run",
     "build": "tsc -p tsconfig.json",

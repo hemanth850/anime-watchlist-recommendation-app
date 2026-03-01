@@ -24,6 +24,7 @@ docs/
 
 - Frontend: React, TypeScript, Vite
 - Backend: Node.js, Express, TypeScript
+- Database: SQLite (file-backed) with SQL migrations
 - Shared: Local workspace package for shared app types
 - Anime data provider: Jikan API (MyAnimeList data)
 - Build: TypeScript project references
@@ -44,6 +45,12 @@ npm install
 npm run dev
 ```
 
+Optional (explicit migration run):
+
+```bash
+npm run db:migrate -w @anime-app/api
+```
+
 3. Open:
 - Web: `http://localhost:5173`
 - API: `http://localhost:4000/health`
@@ -53,6 +60,7 @@ npm run dev
 - `npm run dev` - run web and API together
 - `npm run dev:web` - run frontend only
 - `npm run dev:api` - run backend only
+- `npm run db:migrate -w @anime-app/api` - apply DB migrations and seed demo user
 - `npm run lint` - run ESLint across workspaces
 - `npm run test` - run API unit/integration/e2e test suite
 - `npm run build` - build all workspaces

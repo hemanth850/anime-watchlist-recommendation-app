@@ -21,6 +21,7 @@ import { createUser, findUserByEmail, toPublicUser } from "./auth/store.js";
 import { requestLogger } from "./middleware/logging.js";
 import { getPersonalizedRecommendations } from "./recommendations/engine.js";
 import { getAnimeById, searchJikanCatalog } from "./catalog/jikan.js";
+import { initializeDatabase } from "./db/init.js";
 import {
   addWatchlistItem,
   getUserWatchlist,
@@ -38,6 +39,7 @@ import {
 } from "./utils/validation.js";
 
 const app = express();
+initializeDatabase();
 
 app.use(cors());
 app.use(express.json());
